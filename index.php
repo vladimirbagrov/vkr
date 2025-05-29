@@ -5,7 +5,29 @@ require_once __DIR__.'/db.php';
 require_once __DIR__.'/gpt_integration.php';
 require_once __DIR__.'/product_search.php';
 
-// Обработка AJAX-запроса
+// --- Блок для обработки "Похожие товары" ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['similar_to'])) {
+    $baseProduct = trim($_POST['similar_to']);
+    $products = ProductSearch::getSimilarProducts($baseProduct);
+    $response = GPT::getResponse("Покажи похожие на $baseProduct", $products, false);
+
+    // Сохраняем в сессии
+    $_SESSION['chat'][] = [
+        'query' => "Похожие на: $baseProduct",
+        'response' => $response,
+        'products' => $products,
+        'timestamp' => time()
+    ];
+
+    echo json_encode([
+        'success' => true,
+        'response' => $response,
+        'products' => $products
+    ]);
+    exit;
+}
+
+// --- Обычный запрос пользователя ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
     header('Content-Type: application/json');
 
@@ -17,10 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
 
         // Если ничего не найдено — получить рекомендации
         if (!$found) {
-        $products = ProductSearch::getRandomProducts(); // использовать рекомендуемые
-    }
+            $products = ProductSearch::getRandomProducts(); // использовать рекомендуемые
+        }
 
-    $response = GPT::getResponse($userMessage, $products, $found); // передаём флаг $found
+        $response = GPT::getResponse($userMessage, $products, $found); // передаём флаг $found
 
         // Сохраняем в сессию
         $_SESSION['chat'][] = [
@@ -436,7 +458,9 @@ $chatHistory = $_SESSION['chat'] ?? [];
                                     <?php foreach ($chatItem['products'] as $product): ?>
                                         <div class="product-card">
                                             <div class="product-title"><?= htmlspecialchars($product['name']) ?></div>
-                                            <div class="product-article">Артикул: <?= htmlspecialchars($product['article']) ?></div>
+                                            <?php if (!empty($product['article'])): ?>
+                                                <div class="product-article">Артикул: <?= htmlspecialchars($product['article']) ?></div>
+                                            <?php endif; ?>
                                             <div class="product-price"><?= number_format($product['price'], 0, '', ' ') ?> руб.</div>
                                         </div>
                                     <?php endforeach; ?>
@@ -474,28 +498,29 @@ $chatHistory = $_SESSION['chat'] ?? [];
 
     <script>
     $(document).ready(function() {
-        // Прокрутка чата вниз при загрузке
         const chatBox = $('#chat-box');
         chatBox.scrollTop(chatBox[0].scrollHeight);
-        
-        // Отправка сообщения по нажатию кнопки или Enter
+
         $('#send-btn').click(sendMessage);
         $('#user-message').keypress(function(e) {
             if (e.which == 13) sendMessage();
         });
-        
-        // Обработка клика по подсказкам
+
+        // Быстрые подсказки и "Похожие товары"
         $(document).on('click', '.suggestion-btn', function() {
             const text = $(this).text();
-            $('#user-message').val(text);
-            sendMessage();
+            if (text === "Похожие товары" && window.lastProductName) {
+                sendSimilar(window.lastProductName);
+            } else {
+                $('#user-message').val(text);
+                sendMessage();
+            }
         });
-        
+
         function sendMessage() {
             const message = $('#user-message').val().trim();
             if (!message) return;
-            
-            // Добавляем сообщение пользователя в чат
+
             const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             chatBox.append(`
                 <div class="message-container" style="justify-content: flex-end;">
@@ -507,23 +532,16 @@ $chatHistory = $_SESSION['chat'] ?? [];
                     </div>
                 </div>
             `);
-            
-            // Очищаем поле ввода
+
             $('#user-message').val('');
-            
-            // Показываем индикатор набора сообщения
             $('.typing-indicator').show();
             chatBox.scrollTop(chatBox[0].scrollHeight);
-            
-            // Скрываем подсказки после отправки сообщения
             $('.suggestions').hide();
-            
-            // Отправляем запрос на сервер
+
             $.post('', {message: message}, function(data) {
                 $('.typing-indicator').hide();
-                
+
                 if (data.success) {
-                    // Добавляем ответ бота
                     const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     chatBox.append(`
                         <div class="message-container">
@@ -538,23 +556,21 @@ $chatHistory = $_SESSION['chat'] ?? [];
                             </div>
                         </div>
                     `);
-                    
-                    // Добавляем карточки товаров, если есть
+
+                    // Карточки товаров
                     if (data.products && data.products.length > 0) {
                         let productsHtml = '<div class="products-grid">';
-                        
                         data.products.forEach(product => {
                             productsHtml += `
                                 <div class="product-card">
                                     <div class="product-title">${escapeHtml(product.name)}</div>
-                                    <div class="product-article">Артикул: ${escapeHtml(product.article)}</div>
+                                    ${product.article ? `<div class="product-article">Артикул: ${escapeHtml(product.article)}</div>` : ''}
                                     <div class="product-price">${product.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} руб.</div>
                                 </div>
                             `;
                         });
-                        
                         productsHtml += '</div>';
-                        
+
                         chatBox.append(`
                             <div class="message-container">
                                 <div class="bot-avatar"></div>
@@ -563,17 +579,19 @@ $chatHistory = $_SESSION['chat'] ?? [];
                                 </div>
                             </div>
                         `);
+
+                        // Сохраняем последнее название товара для подсказки "Похожие товары"
+                        window.lastProductName = data.products[0].name;
                     }
-                    
-                    // Показываем новые подсказки
+
+                    // Подсказки
                     $('.suggestions').html(''
                         + '<div class="suggestion-btn">Похожие товары</div>'
                         + '<div class="suggestion-btn">Аксессуары</div>'
                         + '<div class="suggestion-btn">Сопутствующие товары</div>'
                     ).show();
-                    
+
                 } else {
-                    // Показываем ошибку
                     chatBox.append(`
                         <div class="message-container">
                             <div class="bot-avatar">
@@ -587,7 +605,7 @@ $chatHistory = $_SESSION['chat'] ?? [];
                         </div>
                     `);
                 }
-                
+
                 chatBox.scrollTop(chatBox[0].scrollHeight);
             }, 'json').fail(function() {
                 $('.typing-indicator').hide();
@@ -606,8 +624,75 @@ $chatHistory = $_SESSION['chat'] ?? [];
                 chatBox.scrollTop(chatBox[0].scrollHeight);
             });
         }
-        
-        // Функция для экранирования HTML
+
+        function sendSimilar(productName) {
+            $('.typing-indicator').show();
+            chatBox.scrollTop(chatBox[0].scrollHeight);
+            $('.suggestions').hide();
+
+            $.post('', {similar_to: productName}, function(data) {
+                $('.typing-indicator').hide();
+                const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                if (data.success) {
+                    chatBox.append(`
+                        <div class="message-container">
+                            <div class="bot-avatar">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="bot-message message">
+                                    ${data.response || 'Вот похожие товары:'}
+                                    <div class="timestamp">${timestamp}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `);
+
+                    if (data.products && data.products.length > 0) {
+                        let productsHtml = '<div class="products-grid">';
+                        data.products.forEach(product => {
+                            productsHtml += `
+                                <div class="product-card">
+                                    <div class="product-title">${escapeHtml(product.name)}</div>
+                                    ${product.article ? `<div class="product-article">Артикул: ${escapeHtml(product.article)}</div>` : ''}
+                                    <div class="product-price">${product.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} руб.</div>
+                                </div>
+                            `;
+                        });
+                        productsHtml += '</div>';
+                        chatBox.append(`
+                            <div class="message-container">
+                                <div class="bot-avatar"></div>
+                                <div class="message-content">
+                                    ${productsHtml}
+                                </div>
+                            </div>
+                        `);
+                        window.lastProductName = data.products[0].name;
+                    }
+                } else {
+                    chatBox.append(`
+                        <div class="message-container">
+                            <div class="bot-avatar">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="error-message">
+                                    Ошибка: ${data.error || 'Неизвестная ошибка'}
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                }
+                $('.suggestions').html(''
+                    + '<div class="suggestion-btn">Похожие товары</div>'
+                    + '<div class="suggestion-btn">Аксессуары</div>'
+                    + '<div class="suggestion-btn">Сопутствующие товары</div>'
+                ).show();
+                chatBox.scrollTop(chatBox[0].scrollHeight);
+            });
+        }
+
         function escapeHtml(unsafe) {
             return unsafe
                 .replace(/&/g, "&amp;")

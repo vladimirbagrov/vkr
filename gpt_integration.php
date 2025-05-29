@@ -5,26 +5,27 @@ require_once 'config.php';
 
 class GPT {
     public static function getResponse($message, $products, $found = true) {
-    $productText = empty($products)
-        ? "Товары по запросу \"$message\" не найдены."
-        : "Вот товары " . ($found ? "по вашему запросу" : "которые мы можем порекомендовать") . ":\n\n" .
-            implode("\n", array_map(function($p) {
-                return "✅ {$p['name']} — {$p['price']} руб.";
-            }, $products));
+        $productText = empty($products)
+            ? "Товары по запросу \"$message\" не найдены."
+            : "Вот товары " . ($found ? "по вашему запросу" : "которые мы можем порекомендовать") . ":\n\n" .
+                implode("\n", array_map(function($p) {
+                    $article = isset($p['article']) && $p['article'] ? " (арт. {$p['article']})" : "";
+                    return "✅ {$p['name']}{$article} — {$p['price']} руб.";
+                }, $products));
 
-    $data = [
-        "model" => "gpt-3.5-turbo",
-        "messages" => [
-            ["role" => "system", "content" => "Ты продавец-консультант автотоваров. Отвечай строго по теме автотоваров и запчастей, показывай товары только из базы."],
-            ["role" => "user", "content" => "Запрос: \"$message\"\n\n$productText"]
-        ],
-        "temperature" => 0.7,
-        "max_tokens" => 500
-    ];
+        $data = [
+            "model" => GPT_MODEL,
+            "messages" => [
+                ["role" => "system", "content" => "Ты продавец-консультант автотоваров. Отвечай строго по теме автотоваров и запчастей."],
+                ["role" => "user", "content" => "Запрос: \"$message\"\n\n$productText"]
+            ],
+            "temperature" => 0.7,
+            "max_tokens" => 500
+        ];
 
-    $response = self::send($data);
-    return $response ?: "Ошибка в ответе ChatGPT.";
-}
+        $response = self::send($data);
+        return $response ?: "Ошибка в ответе ChatGPT.";
+    }
 
     private static function send($data) {
         $headers = [
@@ -52,7 +53,7 @@ class GPT {
     }
 }
 
-// 🔹 Главная функция обработки запроса пользователя
+// Главная функция обработки запроса пользователя (не используется напрямую, оставлено для расширения)
 function handleUserMessage($message) {
     $products = ProductSearch::findProducts($message);
 
