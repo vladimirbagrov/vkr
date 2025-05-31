@@ -1,8 +1,5 @@
 <?php
 class ProductSearch {
-    /**
-     * Поиск товаров по запросу пользователя
-     */
     public static function findProducts($query) {
         global $pdo;
 
@@ -10,59 +7,28 @@ class ProductSearch {
             return [];
         }
 
-        $stmt = $pdo->prepare("
-            SELECT name, price, article
-            FROM data
-            WHERE name LIKE :query
-            OR SOUNDEX(name) = SOUNDEX(:query)
-            LIMIT 25
-        ");
+        $query = trim($query);
+        $words = preg_split('/[\s,]+/u', $query, -1, PREG_SPLIT_NO_EMPTY);
 
-        $stmt->execute(['query' => '%' . $query . '%']);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
+        $where = [];
+        $params = [];
+        foreach ($words as $idx => $word) {
+            $where[] = "Name LIKE :word$idx";
+            $params["word$idx"] = "%$word%";
+        }
+        $where_str = implode(' AND ', $where);
 
-    /**
-     * Получение случайных товаров, если ничего не найдено
-     */
-    public static function getRandomProducts() {
-        global $pdo;
+        $sql = "SELECT Name as name, Price as price, rating FROM data WHERE $where_str LIMIT 25";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if (!$pdo) {
-            return [];
+        if (empty($result)) {
+            $stmt = $pdo->prepare("SELECT Name as name, Price as price, rating FROM data WHERE Name LIKE :query LIMIT 25");
+            $stmt->execute(['query' => "%$query%"]);
+            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        $stmt = $pdo->query("
-            SELECT name, price, article
-            FROM data
-            ORDER BY RAND()
-            LIMIT 6
-        ");
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
-     * Получение похожих товаров (для рекомендаций)
-     */
-    public static function getSimilarProducts($productName, $limit = 6) {
-        global $pdo;
-
-        if (!$pdo || empty($productName)) {
-            return [];
-        }
-
-        $stmt = $pdo->prepare("
-            SELECT name, price, article
-            FROM data
-            WHERE name LIKE :name AND name != :exact
-            ORDER BY RAND()
-            LIMIT :limit
-        ");
-        $stmt->bindValue(':name', '%' . $productName . '%');
-        $stmt->bindValue(':exact', $productName);
-        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $result;
     }
 }

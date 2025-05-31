@@ -4,27 +4,33 @@ require_once 'product_search.php';
 require_once 'config.php';
 
 class GPT {
-    public static function getResponse($message, $products, $found = true) {
-        $productText = empty($products)
-            ? "Товары по запросу \"$message\" не найдены."
-            : "Вот товары " . ($found ? "по вашему запросу" : "которые мы можем порекомендовать") . ":\n\n" .
-                implode("\n", array_map(function($p) {
-                    $article = isset($p['article']) && $p['article'] ? " (арт. {$p['article']})" : "";
-                    return "✅ {$p['name']}{$article} — {$p['price']} руб.";
-                }, $products));
-
+    public static function extractFilters($userMessage) {
+        $systemPrompt = "Ты помощник в любом онлайн-магазине. По запросу пользователя выдели ключевые слова или категории для поиска товара (например: 'лампа', 'чайник', 'рюкзак', 'Nike', 'до 1000 рублей' и т.д.). Верни только JSON, например: {\"keywords\":[\"лампа\"]}. Если есть ограничение по цене — добавь ключ max_price. Не добавляй в ответ ничего, кроме JSON!";
         $data = [
             "model" => GPT_MODEL,
             "messages" => [
-                ["role" => "system", "content" => "Ты продавец-консультант автотоваров. Отвечай строго по теме автотоваров и запчастей."],
-                ["role" => "user", "content" => "Запрос: \"$message\"\n\n$productText"]
+                ["role" => "system", "content" => $systemPrompt],
+                ["role" => "user", "content" => $userMessage]
             ],
-            "temperature" => 0.7,
-            "max_tokens" => 500
+            "temperature" => 0,
+            "max_tokens" => 150
         ];
-
         $response = self::send($data);
-        return $response ?: "Ошибка в ответе ChatGPT.";
+        $json = trim($response);
+        $json = preg_replace('/^[^{]*({.*?})[^}]*$/s', '$1', $json); // Оставить только JSON
+        $params = json_decode($json, true);
+        return is_array($params) ? $params : [];
+    }
+
+    public static function searchAndReply($userMessage, $products, $recommendations = []) {
+        if (!empty($products)) {
+            $reply = "Вот товары, которые у нас есть:";
+        } elseif (!empty($recommendations)) {
+            $reply = "По вашему запросу ничего не найдено, но вот что я могу порекомендовать:";
+        } else {
+            $reply = "Извините, по вашему запросу ничего не найдено. Пожалуйста, уточните запрос или попробуйте другой товар.";
+        }
+        return $reply;
     }
 
     private static function send($data) {
@@ -51,23 +57,4 @@ class GPT {
 
         return $decoded['choices'][0]['message']['content'] ?? "Ошибка в ответе ChatGPT.";
     }
-}
-
-// Главная функция обработки запроса пользователя (не используется напрямую, оставлено для расширения)
-function handleUserMessage($message) {
-    $products = ProductSearch::findProducts($message);
-
-    // Если ничего не найдено — получаем случайные рекомендации
-    if (empty($products)) {
-        $products = ProductSearch::getRandomProducts();
-    }
-
-    $gptReply = GPT::getResponse($message, $products);
-
-    // Возвращаем структуру для AJAX
-    return [
-        'success' => true,
-        'response' => $gptReply,
-        'products' => $products
-    ];
 }
