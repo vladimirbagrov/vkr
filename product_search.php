@@ -28,7 +28,6 @@ class ProductSearch {
             $stmt->execute(['query' => "%$query%"]);
             $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-
         return $result;
     }
 }
