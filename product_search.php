@@ -1,5 +1,8 @@
 <?php
 class ProductSearch {
+    /**
+     * Поиск товаров по запросу пользователя
+     */
     public static function findProducts($query) {
         global $pdo;
 
@@ -7,27 +10,35 @@ class ProductSearch {
             return [];
         }
 
-        $query = trim($query);
-        $words = preg_split('/[\s,]+/u', $query, -1, PREG_SPLIT_NO_EMPTY);
+        $stmt = $pdo->prepare("
+            SELECT name, price 
+            FROM data 
+            WHERE name LIKE :query 
+            OR SOUNDEX(name) = SOUNDEX(:query) 
+            LIMIT 25
+        ");
 
-        $where = [];
-        $params = [];
-        foreach ($words as $idx => $word) {
-            $where[] = "Name LIKE :word$idx";
-            $params["word$idx"] = "%$word%";
+        $stmt->execute(['query' => '%' . $query . '%']);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Получение случайных товаров, если ничего не найдено
+     */
+    public static function getRandomProducts() {
+        global $pdo;
+
+        if (!$pdo) {
+            return [];
         }
-        $where_str = implode(' AND ', $where);
 
-        $sql = "SELECT Name as name, Price as price, rating FROM data WHERE $where_str LIMIT 25";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $pdo->query("
+            SELECT name, price 
+            FROM data 
+            ORDER BY RAND() 
+            LIMIT 6
+        ");
 
-        if (empty($result)) {
-            $stmt = $pdo->prepare("SELECT Name as name, Price as price, rating FROM data WHERE Name LIKE :query LIMIT 25");
-            $stmt->execute(['query' => "%$query%"]);
-            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-        return $result;
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
