@@ -15,6 +15,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+
 def get_db_connection():
     return pymysql.connect(
         host='localhost',
@@ -26,36 +27,29 @@ def get_db_connection():
     )
 
 @app.route('/api/search', methods=['POST'])
-def search_products():
-    data = request.get_json()
+def search():
+    data = request.get_json(force=True)
     msg = data.get('message', '').strip()
-    if not msg:
-        return jsonify({'reply': 'Пустой запрос', 'products': []}), 400
-
-    with get_db_connection() as conn:
-        with conn.cursor() as cursor:
-            sql = """
-                SELECT id, name, Category, `Selling Price`, `About Product`, description, `Product Url`
-                FROM data2
-                WHERE name LIKE %s
-                   OR Category LIKE %s
-                   OR description LIKE %s
-                LIMIT 10
-            """
-            like = f"%{msg}%"
-            cursor.execute(sql, (like, like, like))
-            products = cursor.fetchall()
-
-    # Можно интегрировать AI-ответ, пока простой шаблон:
-    if products:
-        reply = "Нашёл товары по вашему запросу."
-    else:
-        reply = "К сожалению, по вашему запросу ничего не найдено. Попробуйте изменить формулировку."
-
+    conn = get_db_connection()
+    cursor = conn.cursor()  # добавлено!
+    sql = """
+        SELECT id, name, Category, `Selling Price`, `About Product`, description, `Product Url`
+        FROM data2
+        WHERE name LIKE %s
+           OR Category LIKE %s
+           OR description LIKE %s
+        LIMIT 10
+    """
+    like = f"%{msg}%"
+    print(f"SQL LIKE pattern: '{like}'")
+    cursor.execute(sql, (like, like, like))
+    products = cursor.fetchall()
+    print(f"Found rows: {len(products)}")
+    conn.close()
     return jsonify({
-        'reply': reply,
-        'products': products
+        "reply": f"Найдено товаров: {len(products)}",
+        "products": products
     })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='127.0.0.1', port=5000, debug=True)

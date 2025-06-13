@@ -44,27 +44,33 @@
 //         return json_decode($json, true);
 //     }
 // }
-
-
 class ProductCatalog
 {
     public static function search($text, $limit = 10)
     {
-        $url = 'http://127.0.0.1:5000/search?q=' . urlencode($text) . '&n=' . $limit;
-        $json = @file_get_contents($url);
+        $url = 'http://127.0.0.1:5000/api/search';
+        $payload = json_encode(['message' => $text]);
+
+        $opts = [
+            "http" => [
+                "method" => "POST",
+                "header" => "Content-Type: application/json\r\n",
+                "content" => $payload,
+                "timeout" => 5
+            ]
+        ];
+        $context = stream_context_create($opts);
+        $json = @file_get_contents($url, false, $context);
+
         if ($json === false) return [];
         $arr = json_decode($json, true);
         if (!is_array($arr)) return [];
-        return $arr;
+        return $arr['products'] ?? [];
     }
 
     public static function recommend($text, $limit = 5)
     {
-        $url = 'http://127.0.0.1:5000/recommend?name=' . urlencode($text) . '&n=' . $limit;
-        $json = @file_get_contents($url);
-        if ($json === false) return [];
-        $arr = json_decode($json, true);
-        if (!is_array($arr)) return [];
-        return $arr;
+        // Можно реализовать аналогично search, если будет нужен отдельный endpoint
+        return [];
     }
 }
