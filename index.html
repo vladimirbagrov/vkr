@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -20,6 +20,8 @@
             background: var(--apple-gray);
             color: var(--apple-black);
             margin: 0; padding: 0;
+            height: 100vh;
+            overflow: hidden;
         }
         #chat-container {
             max-width: 490px;
@@ -30,17 +32,14 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            min-height: 80vh;
+            height: 90vh;
+            min-height: 500px;
         }
         #chat-header {
             background: var(--apple-white);
             padding: 32px;
             text-align: center;
             border-bottom: 1px solid #ececec;
-        }
-        #chat-header img {
-            width: 36px; height: 36px;
-            vertical-align: middle;
         }
         #chat-header span {
             font-size: 1.4rem;
@@ -53,6 +52,7 @@
             padding: 26px;
             overflow-y: auto;
             background: var(--apple-card);
+            max-height: 100%;
         }
         .msg {
             margin-bottom: 18px;
@@ -88,8 +88,8 @@
             border-radius: 14px;
             box-shadow: 0 4px 16px 0 rgba(100,100,100,0.06);
             padding: 15px 20px;
-            min-width: 170px;
-            max-width: 220px;
+            min-width: 200px;
+            max-width: 280px;
             margin-bottom: 7px;
             font-size: 0.99rem;
             color: var(--apple-black);
@@ -107,19 +107,26 @@
             font-size: 17px;
             margin-top: 2px;
         }
-        .prod-rating {
-            font-size: 15px;
-            color: #ff9800;
-        }
         .prod-price {
             font-size: 15px;
             color: #0071e3;
             font-weight: 600;
         }
-        .prod-rating:before {
-            content: '★';
-            margin-right: 3px;
-            color: #ff9800;
+        .prod-more {
+            margin-top: 8px;
+            background: var(--apple-blue);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 7px 18px;
+            font-size: 0.96rem;
+            cursor: pointer;
+            transition: background .18s;
+            font-weight: 500;
+        }
+        .prod-more:active,
+        .prod-more:hover {
+            background: #005bb5;
         }
         #input-area {
             background: var(--apple-gray);
@@ -153,7 +160,7 @@
             background: #005bb5;
         }
         @media (max-width:600px){
-            #chat-container{margin:0;min-height:100vh;border-radius:0;}
+            #chat-container{margin:0;height:100vh;min-height:0;border-radius:0;}
             #chat-header{padding:18px;}
             #chat{padding:12px;}
             #input-area{padding:12px;}
@@ -190,16 +197,44 @@ function showProducts(products) {
         let d = document.createElement('div');
         d.className = 'prod';
         d.innerHTML = `
-            <div class="prod-category">${p.main_category_ru ? p.main_category_ru : ''}${p.sub_category_ru ? ' / ' + p.sub_category_ru : ''}</div>
-            <div class="prod-name">${p.name}</div>
-            <div class="prod-rating">${p.ratings ? p.ratings : '-'}</div>
-            <div class="prod-price">${p.actual_price}₽</div>
+            <div class="prod-name">${p.name || p['Product Name'] || 'Без названия'}</div>
+            <div class="prod-category">${p.Category || ""}</div>
+            <div class="prod-price">${p['Selling Price'] || ""}</div>
+            <button class="prod-more" type="button">Подробнее</button>
         `;
+        d.querySelector('.prod-more').onclick = () => {
+            if (p['Product Url'] && p['Product Url'].startsWith('http')) {
+                window.open(p['Product Url'], '_blank');
+            } else {
+                alert(
+                    `Название: ${p.name || p['Product Name'] || 'Без названия'}\n` +
+                    `Категория: ${p.Category || ""}\n` +
+                    `Цена: ${p['Selling Price'] || ""}`
+                );
+            }
+        };
         wrap.appendChild(d);
     });
     chat.appendChild(wrap);
     chat.scrollTop = chat.scrollHeight;
 }
+async function loadHistory() {
+    let resp = await fetch('/api/index.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({get_history: true})
+    });
+    let data = await resp.json();
+    if (data.history && data.history.length) {
+        data.history.forEach(item => {
+            showMsg(item.user, 'user');
+            showMsg(item.bot, 'bot');
+            showProducts(item.products);
+        });
+    }
+}
+loadHistory();
+
 document.getElementById('input-area').onsubmit = async e => {
     e.preventDefault();
     const input = document.getElementById('input');
@@ -216,6 +251,266 @@ document.getElementById('input-area').onsubmit = async e => {
     let data = await resp.json();
     input.disabled = false;
     if (data.reply) showMsg(data.reply, 'bot');
+    else showMsg("Ответ от ассистента не получен.", 'bot');
+    showProducts(data.products);
+};
+</script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Онлайн-консультант</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css?family=SF+Pro+Display:400,600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --apple-gray: #f5f5f7;
+            --apple-white: #fff;
+            --apple-black: #1d1d1f;
+            --apple-blue: #0071e3;
+            --apple-card: #f9f9fb;
+            --apple-shadow: 0 8px 32px 0 rgba(60,60,60,0.08);
+            --radius: 18px;
+        }
+        body {
+            font-family: 'SF Pro Display', 'Segoe UI', Arial, sans-serif;
+            background: var(--apple-gray);
+            color: var(--apple-black);
+            margin: 0; padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #chat-container {
+            max-width: 490px;
+            margin: 60px auto 0 auto;
+            background: var(--apple-white);
+            border-radius: var(--radius);
+            box-shadow: var(--apple-shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            min-height: 500px;
+        }
+        #chat-header {
+            background: var(--apple-white);
+            padding: 32px;
+            text-align: center;
+            border-bottom: 1px solid #ececec;
+        }
+        #chat-header span {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-left: 10px;
+            letter-spacing: 0.03em;
+        }
+        #chat {
+            flex: 1;
+            padding: 26px;
+            overflow-y: auto;
+            background: var(--apple-card);
+            max-height: 100%;
+        }
+        .msg {
+            margin-bottom: 18px;
+            max-width: 75%;
+            border-radius: var(--radius);
+            padding: 16px 22px;
+            font-size: 1.06rem;
+            line-height: 1.5;
+            box-shadow: 0 2px 8px 0 rgba(0,0,0,0.05);
+            word-break: break-word;
+        }
+        .bot {
+            background: var(--apple-white);
+            color: var(--apple-black);
+            border-bottom-left-radius: 5px;
+            border-top-left-radius: 5px;
+        }
+        .user {
+            background: var(--apple-blue);
+            color: #fff;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+            border-top-right-radius: 5px;
+        }
+        .products {
+            margin: 12px 0 0 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .prod {
+            background: var(--apple-white);
+            border-radius: 14px;
+            box-shadow: 0 4px 16px 0 rgba(100,100,100,0.06);
+            padding: 15px 20px;
+            min-width: 200px;
+            max-width: 280px;
+            margin-bottom: 7px;
+            font-size: 0.99rem;
+            color: var(--apple-black);
+            transition: box-shadow .2s;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .prod-category {
+            color: #888;
+            font-size: 14px;
+        }
+        .prod-name {
+            font-weight: bold;
+            font-size: 17px;
+            margin-top: 2px;
+        }
+        .prod-price {
+            font-size: 15px;
+            color: #0071e3;
+            font-weight: 600;
+        }
+        .prod-more {
+            margin-top: 8px;
+            background: var(--apple-blue);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 7px 18px;
+            font-size: 0.96rem;
+            cursor: pointer;
+            transition: background .18s;
+            font-weight: 500;
+        }
+        .prod-more:active,
+        .prod-more:hover {
+            background: #005bb5;
+        }
+        #input-area {
+            background: var(--apple-gray);
+            padding: 22px 30px;
+            display: flex;
+            gap: 14px;
+            border-top: 1px solid #ececec;
+        }
+        #input {
+            flex: 1;
+            border: none;
+            border-radius: 12px;
+            background: var(--apple-white);
+            padding: 14px 18px;
+            font-size: 1rem;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+            outline: none;
+        }
+        #send {
+            background: var(--apple-blue);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            padding: 0 30px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background .18s;
+        }
+        #send:active {
+            background: #005bb5;
+        }
+        @media (max-width:600px){
+            #chat-container{margin:0;height:100vh;min-height:0;border-radius:0;}
+            #chat-header{padding:18px;}
+            #chat{padding:12px;}
+            #input-area{padding:12px;}
+        }
+    </style>
+</head>
+<body>
+<div id="chat-container">
+    <div id="chat-header">
+        <span>Онлайн-консультант</span>
+    </div>
+    <div id="chat">
+        <div class="msg bot">Здравствуйте! Я помогу выбрать нужные товары. Чем могу быть полезен?</div>
+    </div>
+    <form id="input-area" autocomplete="off">
+        <input id="input" placeholder="Например: Кондиционеры" autofocus>
+        <button id="send" type="submit">→</button>
+    </form>
+</div>
+<script>
+const chat = document.getElementById('chat');
+function showMsg(text, who='bot') {
+    let div = document.createElement('div');
+    div.className = 'msg ' + who;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+function showProducts(products) {
+    if (!products || !products.length) return;
+    let wrap = document.createElement('div');
+    wrap.className = 'products';
+    products.forEach(p => {
+        let d = document.createElement('div');
+        d.className = 'prod';
+        d.innerHTML = `
+            <div class="prod-name">${p.name || p['Product Name'] || 'Без названия'}</div>
+            <div class="prod-category">${p.Category || ""}</div>
+            <div class="prod-price">${p['Selling Price'] || ""}</div>
+            <button class="prod-more" type="button">Подробнее</button>
+        `;
+        d.querySelector('.prod-more').onclick = () => {
+            if (p['Product Url'] && p['Product Url'].startsWith('http')) {
+                window.open(p['Product Url'], '_blank');
+            } else {
+                alert(
+                    `Название: ${p.name || p['Product Name'] || 'Без названия'}\n` +
+                    `Категория: ${p.Category || ""}\n` +
+                    `Цена: ${p['Selling Price'] || ""}`
+                );
+            }
+        };
+        wrap.appendChild(d);
+    });
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+}
+async function loadHistory() {
+    let resp = await fetch('/api/index.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({get_history: true})
+    });
+    let data = await resp.json();
+    if (data.history && data.history.length) {
+        data.history.forEach(item => {
+            showMsg(item.user, 'user');
+            showMsg(item.bot, 'bot');
+            showProducts(item.products);
+        });
+    }
+}
+loadHistory();
+
+document.getElementById('input-area').onsubmit = async e => {
+    e.preventDefault();
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text) return;
+    showMsg(text, 'user');
+    input.value = '';
+    input.disabled = true;
+    let resp = await fetch('/api/index.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message: text})
+    });
+    let data = await resp.json();
+    input.disabled = false;
+    if (data.reply) showMsg(data.reply, 'bot');
+    else showMsg("Ответ от ассистента не получен.", 'bot');
     showProducts(data.products);
 };
 </script>
