@@ -111,6 +111,31 @@
         .prod-desc {
             color: #555;
             font-size: 14px;
+            max-height: 60px;
+            overflow-y: auto;
+            margin-bottom: 8px;
+        }
+        .prod-more {
+            width: 100%;
+            margin-top: 4px;
+            display: flex;
+        }
+        .prod-more-btn {
+            flex: 1;
+            width: 100%;
+            padding: 10px 0;
+            font-size: 15px;
+            border-radius: 6px;
+            border: none;
+            background: #0071e3;
+            color: #fff;
+            cursor: pointer;
+            transition: background .2s;
+            font-weight: 500;
+            text-align: center;
+        }
+        .prod-more-btn:hover {
+            background: #005bb5;
         }
         #input-area {
             background: var(--apple-gray);
@@ -183,8 +208,13 @@ function showProducts(products) {
         d.innerHTML = `
             <div class="prod-category">${p.Category || ''}</div>
             <div class="prod-name">${p.name}</div>
-            <div class="prod-price">${p['Selling Price'] ? p['Selling Price'] + '₽' : ''}</div>
-            <div class="prod-desc">${p['About Product'] || ''}</div>
+            <div class="prod-price">${p['Selling Price'] ? p['Selling Price'] + '$' : ''}</div>
+            <div class="prod-desc">${p['About Product'] || p.description || ''}</div>
+            <div class="prod-more">
+                <a href="${p['Product Url'] || '#'}" target="_blank" rel="noopener" style="width:100%">
+                    <button class="prod-more-btn">Подробнее</button>
+                </a>
+            </div>
         `;
         wrap.appendChild(d);
     });
