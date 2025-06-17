@@ -1,23 +1,11 @@
 <?php
-require_once __DIR__ . '/api/ChatService.php';
-
-$host = 'localhost';
-$user = 'cg38360_vkr';
-$pass = '05122003BagVA';
-$db = 'cg38360_vkr';
-$table = 'data';
-$charset = 'utf8mb4';
-
-$mysqli = new mysqli($host, $user, $pass, $db);
-$mysqli->set_charset($charset);
-
 function esc($s) { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Каталог товаров (чат и интеллектуальный поиск)</title>
+    <title>Каталог товаров (интеллектуальный поиск)</title>
     <meta name="viewport" content="width=1100,initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css?family=SF+Pro+Display:400,600&display=swap" rel="stylesheet">
     <style>
@@ -243,7 +231,7 @@ function esc($s) { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF
 <a id="nav-link" href="index.html">← На главную</a>
 <div id="chat-container">
     <div id="chat-header">
-        <span>Каталог товаров (фильтрация и чат)</span>
+        <span>Каталог товаров (интеллектуальный поиск)</span>
     </div>
     <div id="chat">
         <div class="msg bot">Здравствуйте! Я помогу подобрать подходящий товар. Напишите ваш запрос.</div>
@@ -308,7 +296,6 @@ function showProducts(products) {
     chat.scrollTop = chat.scrollHeight;
 }
 
-// Главная функция отправки — теперь объединяем Flask+ChatService
 document.getElementById('input-area').onsubmit = async e => {
     e.preventDefault();
     const input = document.getElementById('input');
@@ -324,7 +311,7 @@ document.getElementById('input-area').onsubmit = async e => {
     if (old) old.remove();
     filterBar.classList.remove('active');
 
-    // 1. Сначала отправляем запрос на Flask для поиска товаров
+    // Только Flask!
     let flaskResp = await fetch('/api/cosine_search', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -332,20 +319,10 @@ document.getElementById('input-area').onsubmit = async e => {
     });
     let flaskData = await flaskResp.json();
 
-    // 2. Параллельно (или после) отправляем запрос на ChatService для генерации живого ответа
-    let chatResp = await fetch('api/ChatService.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message: text})
-    });
-    let chatData = await chatResp.json();
-
     input.disabled = false;
 
-    // 3. Выводим сначала "живой" ответ, потом товары (если есть)
-    if (chatData.reply) showMsg(chatData.reply, 'bot');
-    if (flaskData.reply && (!chatData.reply || flaskData.reply !== chatData.reply)) showMsg(flaskData.reply, 'bot');
-
+    // Показываем только ответ и товары от Flask
+    if (flaskData.reply) showMsg(flaskData.reply, 'bot');
     if (flaskData.products && flaskData.products.length) {
         lastProducts = flaskData.products;
         showProducts(lastProducts);

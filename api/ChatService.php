@@ -49,7 +49,6 @@ PROMPT;
             return 'SEARCH: ' . $userText;
         }
         $data = json_decode($result, true);
-        // Попробуем получить ответ в разных вариантах
         $intent = $data['choices'][0]['message']['content'] ?? $data['choices'][0]['text'] ?? null;
         if (!$intent) {
             return 'SEARCH: ' . $userText;
@@ -106,13 +105,11 @@ PROMPT;
         }
         $data = json_decode($result, true);
 
-        // Пробуем разные варианты поля ответа
         $answer = $data['choices'][0]['message']['content'] ?? 
                   $data['choices'][0]['text'] ?? 
                   null;
 
         if (!$answer) {
-            // Вернем всю структуру для отладки
             return "Ошибка GPT: " . print_r($data, 1);
         }
         return trim($answer);

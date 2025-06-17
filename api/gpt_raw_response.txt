@@ -493,3 +493,102 @@ getIntent:
     }
   }
 }
+ask:
+{
+  "id": "gen-1750159746-Tei6FIcoARhq3bPBWOyd",
+  "model": "openai\/gpt-4o-mini",
+  "object": "chat.completion",
+  "created": 1750159746,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "\u0423 \u043d\u0430\u0441 \u0435\u0441\u0442\u044c \u043a\u043e\u043d\u0434\u0438\u0446\u0438\u043e\u043d\u0435\u0440\u044b.",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "system_fingerprint": "fp_34a54ae93c",
+  "usage": {
+    "prompt_tokens": 696,
+    "completion_tokens": 24,
+    "total_tokens": 720,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  }
+}
+ask:
+{
+  "id": "gen-1750159791-1T20K2SOckdh5VS6MIxV",
+  "model": "openai\/gpt-4o-mini",
+  "object": "chat.completion",
+  "created": 1750159791,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u041a\u0430\u043a \u044f \u043c\u043e\u0433\u0443 \u043f\u043e\u043c\u043e\u0447\u044c \u0432\u0430\u043c \u0441\u0435\u0433\u043e\u0434\u043d\u044f?",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "system_fingerprint": "fp_34a54ae93c",
+  "usage": {
+    "prompt_tokens": 674,
+    "completion_tokens": 44,
+    "total_tokens": 718,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  }
+}
+ask:
+{
+  "id": "gen-1750159944-5DmkVc4Ze6Zs0NasDHDA",
+  "model": "openai\/gpt-4o-mini",
+  "object": "chat.completion",
+  "created": 1750159944,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "\u041f\u0440\u0438\u0432\u0435\u0442! \u041a\u0430\u043a \u044f \u043c\u043e\u0433\u0443 \u043f\u043e\u043c\u043e\u0447\u044c \u0432\u0430\u043c \u0441\u0435\u0433\u043e\u0434\u043d\u044f?",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "system_fingerprint": "fp_34a54ae93c",
+  "usage": {
+    "prompt_tokens": 674,
+    "completion_tokens": 38,
+    "total_tokens": 712,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  }
+}

@@ -270,7 +270,9 @@ def get_all_products_data():
 @app.route('/api/cosine_search', methods=['POST'])
 def cosine_search():
     data = request.get_json(force=True)
+    print("RAW DATA:", data)
     user_query = data.get('query', '').strip()
+    print("USER QUERY:", repr(user_query))
     if not user_query:
         return jsonify({"reply": "Пустой запрос", "products": []})
     all_products = get_all_products_data()
