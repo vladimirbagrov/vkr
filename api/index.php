@@ -1,42 +1,8 @@
 <?php
-// ile_put_contents('log.txt', "Запрос: " . $query . "\n", FILE_APPEND);
-// file_put_contents('log.txt', "Ответ от Python: " . $response . "\n", FILE_APPEND);
-// ini_set('display_errors', 1);
-// require_once __DIR__ . '/ChatService.php';
-// require_once __DIR__ . '/ProductCatalog.php';
-
-// header('Content-Type: application/json; charset=utf-8');
-
-// $data = json_decode(file_get_contents('php://input'), true);
-// $msg = trim($data['message'] ?? '');
-
-// if (!$msg) {
-//     http_response_code(400);
-//     echo json_encode(['reply' => 'Пустой запрос', 'products' => []]);
-//     exit;
-// }
-
-// $products = ProductCatalog::search($msg);
-
-// // Для отладки (после $products = ProductCatalog::search($msg);)
-// error_log('Найдено товаров: ' . count($products));
-// error_log(print_r($products, 1));
-
-// // Используем ChatService для генерации ответа ассистента на основе сообщения пользователя и найденных товаров
-// $chat = new ChatService();
-// $reply = $chat->ask($msg, $products);
-
-// echo json_encode([
-//     'reply' => $reply,
-//     'products' => $products
-// ], JSON_UNESCAPED_UNICODE);
-
 require_once __DIR__ . '/ChatService.php';
-// require_once __DIR__ . '/ProductCatalog.php'; // не нужен, если всё ходит через Flask
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Получаем message из POST-запроса
 $data = json_decode(file_get_contents('php://input'), true);
 $message = isset($data['message']) ? trim($data['message']) : '';
 
@@ -46,16 +12,18 @@ if (!$message) {
     exit;
 }
 
-// 1. Получаем intent от GPT
 $chat = new ChatService();
 $intent = $chat->getIntent($message);
 
-// 2. Разбираем, какой endpoint использовать
+// Можешь упростить — если эта копия только для catalog.php, просто всегда отправляй на cosine_search.
 if (preg_match('/^RECOMMEND:\s*(.+)$/iu', $intent, $m)) {
     $endpoint = '/api/recommend';
     $query = trim($m[1]);
 } elseif (preg_match('/^SEARCH:\s*(.+)$/iu', $intent, $m)) {
     $endpoint = '/api/search';
+    $query = trim($m[1]);
+} elseif (preg_match('/^CATALOG:\s*(.+)$/iu', $intent, $m)) {
+    $endpoint = '/api/cosine_search';
     $query = trim($m[1]);
 } else {
     // fallback — обычный поиск
@@ -63,12 +31,15 @@ if (preg_match('/^RECOMMEND:\s*(.+)$/iu', $intent, $m)) {
     $query = $message;
 }
 
-// 3. Отправляем запрос на нужный endpoint Flask
+$postField = ['message' => $query];
+
+file_put_contents(__DIR__ . "/debug.log", date('c') . " | endpoint: $endpoint | post: " . json_encode($postField) . "\n", FILE_APPEND);
+
 $ch = curl_init('http://127.0.0.1:5000' . $endpoint);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json; charset=utf-8'));
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['message' => $query]));
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postField));
 
 $response = curl_exec($ch);
 
@@ -80,6 +51,5 @@ if ($response === false) {
     exit;
 }
 
-// Просто прокидываем ответ от Flask (он уже в нужном формате)
 echo $response;
 ?>

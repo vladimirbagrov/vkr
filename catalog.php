@@ -9,7 +9,6 @@ function esc($s) { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF
     <meta name="viewport" content="width=1100,initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css?family=SF+Pro+Display:400,600&display=swap" rel="stylesheet">
     <style>
-        /* --- ваш CSS без изменений --- */
         :root {
             --apple-gray: #f5f5f7;
             --apple-white: #fff;
@@ -311,20 +310,20 @@ document.getElementById('input-area').onsubmit = async e => {
     if (old) old.remove();
     filterBar.classList.remove('active');
 
-    // Только Flask!
-    let flaskResp = await fetch('/api/cosine_search', {
+    // Отправляем запрос на PHP index.php (универсальный endpoint)
+    let resp = await fetch('/api/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({query: text})
+        body: JSON.stringify({message: text}) // поле message!
     });
-    let flaskData = await flaskResp.json();
+    let data = await resp.json();
 
     input.disabled = false;
 
     // Показываем только ответ и товары от Flask
-    if (flaskData.reply) showMsg(flaskData.reply, 'bot');
-    if (flaskData.products && flaskData.products.length) {
-        lastProducts = flaskData.products;
+    if (data.reply) showMsg(data.reply, 'bot');
+    if (data.products && data.products.length) {
+        lastProducts = data.products;
         showProducts(lastProducts);
     } else {
         lastProducts = [];

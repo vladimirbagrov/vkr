@@ -166,8 +166,7 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
-# --- Для первой страницы (рекомендации и поиск, таблица data2) ---
-
+# --- Для главной (index.html) — таблица data2 ---
 def get_all_products_data2():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -202,10 +201,7 @@ def recommend():
     all_products = get_all_products_data2()
     matched_product = find_best_match(user_message, all_products)
 
-    print("user_message:", repr(user_message))
-    print("matched_product:", matched_product['name'] if matched_product else None)
-
-    if not matched_product or not matched_product['processed_text']:
+    if not matched_product or not matched_product.get('processed_text'):
         return jsonify({
             "reply": "Товар не найден или нет информации для поиска похожих.",
             "products": []
@@ -247,21 +243,15 @@ def search():
     products = cursor.fetchall()
     conn.close()
     return jsonify({
-        "reply": f"Найдено товаров: {len(products)}",
+        "reply": f"Найдено товаров: {len(products)}" if products else "Ничего не найдено",
         "products": products
     })
 
-@app.route('/api/list_products')
-def list_products():
-    all_products = get_all_products_data2()
-    return jsonify([row['name'] for row in all_products])
-
-# --- Для второй страницы (поиск по косинусному расстоянию, таблица data) ---
-
+# --- Для каталога (catalog.php) — таблица data ---
 def get_all_products_data():
     conn = get_db_connection()
     cursor = conn.cursor()
-    sql = """SELECT id, name, main_category_ru, sub_category_ru, actual_price, ratings, description, processed_text, link FROM data"""
+    sql = """SELECT id, name, link, ratings, actual_price, main_category_ru, sub_category_ru FROM data"""
     cursor.execute(sql)
     rows = cursor.fetchall()
     conn.close()
@@ -270,30 +260,30 @@ def get_all_products_data():
 @app.route('/api/cosine_search', methods=['POST'])
 def cosine_search():
     data = request.get_json(force=True)
-    print("RAW DATA:", data)
-    user_query = data.get('query', '').strip()
-    print("USER QUERY:", repr(user_query))
-    if not user_query:
-        return jsonify({"reply": "Пустой запрос", "products": []})
+    print("DATA:", data)
+    user_query = data.get('message', '').strip()
+    print("USER QUERY:", user_query)
     all_products = get_all_products_data()
+    print("FIRST PRODUCT:", all_products[0] if all_products else 'NO PRODUCTS')
     docs = []
     for row in all_products:
         text = (
-            (row.get('processed_text') or '') + ' ' +
             (row.get('name') or '') + ' ' +
             (row.get('main_category_ru') or '') + ' ' +
-            (row.get('sub_category_ru') or '') + ' ' +
-            (row.get('description') or '')
+            (row.get('sub_category_ru') or '')
         )
         docs.append(text.strip())
+    print("DOC EXAMPLES:", docs[:3])
+
     stop_words = set(stopwords.words('english')) | set(stopwords.words('russian'))
     vectorizer = TfidfVectorizer(stop_words=stop_words)
     tfidf_matrix = vectorizer.fit_transform([user_query] + docs)
     sim_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
     top_idx = np.argsort(sim_scores)[-12:][::-1]
     results = [all_products[i] for i in top_idx if sim_scores[i] > 0]
+
     return jsonify({
-        "reply": f"Найдено товаров: {len(results)}",
+        "reply": f"Найдено товаров: {len(results)}" if results else "Ничего не найдено",
         "products": results
     })
 
