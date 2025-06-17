@@ -1,14 +1,19 @@
 <?php
+// catalog.php — каталог с интеллектуальным поиском через Flask
+
+require_once __DIR__ . '/api/ChatService.php';
+
 function esc($s) { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Каталог товаров (интеллектуальный поиск)</title>
+    <title>Каталог товаров (чат и интеллектуальный поиск)</title>
     <meta name="viewport" content="width=1100,initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css?family=SF+Pro+Display:400,600&display=swap" rel="stylesheet">
     <style>
+        /* ... (CSS без изменений, как у вас) ... */
         :root {
             --apple-gray: #f5f5f7;
             --apple-white: #fff;
@@ -230,7 +235,7 @@ function esc($s) { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF
 <a id="nav-link" href="index.html">← На главную</a>
 <div id="chat-container">
     <div id="chat-header">
-        <span>Каталог товаров (интеллектуальный поиск)</span>
+        <span>Каталог товаров (фильтрация и чат)</span>
     </div>
     <div id="chat">
         <div class="msg bot">Здравствуйте! Я помогу подобрать подходящий товар. Напишите ваш запрос.</div>
@@ -251,102 +256,6 @@ function esc($s) { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF
     </form>
 </div>
 <script>
-// let lastProducts = [];
-// const chat = document.getElementById('chat');
-// const filterBar = document.getElementById('filter-bar');
-// const sortSel = document.getElementById('sort');
-
-// function showMsg(text, who='bot') {
-//     let div = document.createElement('div');
-//     div.className = 'msg ' + who;
-//     div.textContent = text;
-//     chat.appendChild(div);
-//     chat.scrollTop = chat.scrollHeight;
-// }
-
-// function showProducts(products) {
-//     const old = chat.querySelector('.products');
-//     if (old) old.remove();
-
-//     if (!products || !products.length) {
-//         filterBar.classList.remove('active');
-//         return;
-//     }
-//     filterBar.classList.add('active');
-//     let wrap = document.createElement('div');
-//     wrap.className = 'products';
-//     products.forEach(p => {
-//         let d = document.createElement('div');
-//         d.className = 'prod';
-//         d.innerHTML = `
-//             <div class="prod-category">${(p.main_category_ru||'') + (p.sub_category_ru ? " / "+p.sub_category_ru : "")}</div>
-//             <div class="prod-name">${p.name}</div>
-//             <div class="prod-price">${p.actual_price ? p.actual_price + '₽' : ''}</div>
-//             <div>Рейтинг: ${p.ratings || 'нет'}</div>
-//             <div class="prod-more">
-//                 <a href="${p.link || '#'}" target="_blank" rel="noopener" style="width:100%">
-//                     <button class="prod-more-btn" type="button">Подробнее</button>
-//                 </a>
-//             </div>
-//         `;
-//         wrap.appendChild(d);
-//     });
-//     chat.appendChild(wrap);
-//     chat.scrollTop = chat.scrollHeight;
-// }
-
-// document.getElementById('input-area').onsubmit = async e => {
-//     e.preventDefault();
-//     const input = document.getElementById('input');
-//     const text = input.value.trim();
-//     if (!text) return;
-//     showMsg(text, 'user');
-//     input.value = '';
-//     input.disabled = true;
-//     sortSel.value = '';
-
-//     // Чистим старые товары
-//     const old = chat.querySelector('.products');
-//     if (old) old.remove();
-//     filterBar.classList.remove('active');
-
-//     // Отправляем запрос на PHP index.php (универсальный endpoint)
-//     let resp = await fetch('/api/', {
-//         method: 'POST',
-//         headers: {'Content-Type': 'application/json'},
-//         body: JSON.stringify({message: text}) // поле message!
-//     });
-//     let data = await resp.json();
-
-//     input.disabled = false;
-
-//     // Показываем только ответ и товары от Flask
-//     if (data.reply) showMsg(data.reply, 'bot');
-//     if (data.products && data.products.length) {
-//         lastProducts = data.products;
-//         showProducts(lastProducts);
-//     } else {
-//         lastProducts = [];
-//     }
-// };
-
-// sortSel.onchange = () => {
-//     sortSel.classList.add('active');
-//     if (!lastProducts.length) return;
-//     let arr = [...lastProducts];
-//     switch (sortSel.value) {
-//         case 'price_asc':
-//             arr.sort((a,b)=>(parseFloat(a.actual_price)||0)-(parseFloat(b.actual_price)||0)); break;
-//         case 'price_desc':
-//             arr.sort((a,b)=>(parseFloat(b.actual_price)||0)-(parseFloat(a.actual_price)||0)); break;
-//         case 'rating_asc':
-//             arr.sort((a,b)=>(parseFloat(a.ratings)||0)-(parseFloat(b.ratings)||0)); break;
-//         case 'rating_desc':
-//             arr.sort((a,b)=>(parseFloat(b.ratings)||0)-(parseFloat(a.ratings)||0)); break;
-//     }
-//     showProducts(arr);
-// };
-// sortSel.onblur = () => { sortSel.classList.remove('active'); }
 let lastProducts = [];
 const chat = document.getElementById('chat');
 const filterBar = document.getElementById('filter-bar');
@@ -401,28 +310,26 @@ document.getElementById('input-area').onsubmit = async e => {
     input.disabled = true;
     sortSel.value = '';
 
+    // Чистим старые товары
     const old = chat.querySelector('.products');
     if (old) old.remove();
     filterBar.classList.remove('active');
 
-    // intent: 'CATALOG' для каталога
-    // let resp = await fetch('/api/', {
-    //     method: 'POST',
-    //     headers: {'Content-Type': 'application/json'},
-    //     body: JSON.stringify({message: text, intent: 'CATALOG'})
-    // });
-    let resp = await fetch('/api/', {
+    // Отправляем запрос на Flask для поиска товаров (поиск по леммам)
+    let flaskResp = await fetch('/api/cosine_search', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message: text, intent: 'CATALOG'})
+        body: JSON.stringify({message: text})
     });
-    let data = await resp.json();
+    let flaskData = await flaskResp.json();
 
     input.disabled = false;
 
-    if (data.reply) showMsg(data.reply, 'bot');
-    if (data.products && data.products.length) {
-        lastProducts = data.products;
+    // Выводим ответ и товары (если есть)
+    if (flaskData.reply) showMsg(flaskData.reply, 'bot');
+
+    if (flaskData.products && flaskData.products.length) {
+        lastProducts = flaskData.products;
         showProducts(lastProducts);
     } else {
         lastProducts = [];

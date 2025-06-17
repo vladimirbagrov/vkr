@@ -100,10 +100,11 @@
 #         WHERE name LIKE %s
 #            OR Category LIKE %s
 #            OR description LIKE %s
+#            OR processed_text LIKE %s
 #         LIMIT 10
 #     """
 #     like = f"%{msg}%"
-#     cursor.execute(sql, (like, like, like))
+#     cursor.execute(sql, (like, like, like, like))
 #     products = cursor.fetchall()
 #     conn.close()
 #     return jsonify({
@@ -115,49 +116,56 @@
 # def get_all_products_data():
 #     conn = get_db_connection()
 #     cursor = conn.cursor()
-#     sql = """SELECT id, name, link, ratings, actual_price, main_category_ru, sub_category_ru FROM data"""
+#     sql = """SELECT id, name, main_category_ru, sub_category_ru, actual_price, ratings, lemmas, link FROM data"""
 #     cursor.execute(sql)
 #     rows = cursor.fetchall()
 #     conn.close()
 #     return rows
-
+    
 # @app.route('/api/cosine_search', methods=['POST'])
 # def cosine_search():
 #     data = request.get_json(force=True)
-#     print("cosine_search DATA:", data)
-#     user_query = data.get('message', '').strip()
+#     user_query = data.get('query', '').strip()
 #     if not user_query:
 #         return jsonify({"reply": "Пустой запрос", "products": []})
 
 #     all_products = get_all_products_data()
-#     if not all_products:
-#         return jsonify({"reply": "Нет товаров в базе.", "products": []})
-
 #     docs = []
 #     for row in all_products:
-#         text = (
-#             (row.get('name') or '') + ' ' +
-#             (row.get('main_category_ru') or '') + ' ' +
-#             (row.get('sub_category_ru') or '')
-#         )
-#         docs.append(text.strip())
+#         doc = ' '.join([
+#             str(row.get('name') or ''),
+#             str(row.get('main_category_ru') or ''),
+#             str(row.get('sub_category_ru') or ''),
+#             str(row.get('description') or '')
+#         ])
+#         docs.append(doc)
 
 #     stop_words = set(stopwords.words('english')) | set(stopwords.words('russian'))
 #     vectorizer = TfidfVectorizer(stop_words=stop_words)
 #     tfidf_matrix = vectorizer.fit_transform([user_query] + docs)
 #     sim_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
-#     top_idx = np.argsort(sim_scores)[-12:][::-1]
-#     results = [all_products[i] for i in top_idx if sim_scores[i] > 0]
+#     top_idx = np.argsort(sim_scores)[::-1]
+
+#     # Устанавливаем минимальный порог релевантности
+#     threshold = 0.18
+#     results = [
+#         all_products[i] for i in top_idx if sim_scores[i] >= threshold
+#     ][:12]
+
+#     if not results:
+#         return jsonify({
+#             "reply": "Ничего не найдено",
+#             "products": []
+#         })
 
 #     return jsonify({
-#         "reply": f"Найдено товаров: {len(results)}" if results else "Ничего не найдено",
+#         "reply": f"Найдено товаров: {len(results)}",
 #         "products": results
 #     })
-
 # if __name__ == '__main__':
 #     app.run(host='127.0.0.1', port=5000, debug=True)
-import os
 
+import os
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -188,7 +196,7 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
-# --- Для главной (index.html) — таблица data2 ---
+# --- Для первой страницы (index.html) — таблица data2 ---
 def get_all_products_data2():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -258,10 +266,11 @@ def search():
         WHERE name LIKE %s
            OR Category LIKE %s
            OR description LIKE %s
+           OR processed_text LIKE %s
         LIMIT 10
     """
     like = f"%{msg}%"
-    cursor.execute(sql, (like, like, like))
+    cursor.execute(sql, (like, like, like, like))
     products = cursor.fetchall()
     conn.close()
     return jsonify({
@@ -269,48 +278,54 @@ def search():
         "products": products
     })
 
-# --- Для каталога (catalog, catalog.php, api/cosine_search) — таблица data ---
+# --- Для второй страницы (catalog.php) — таблица data ---
+def get_all_products_data():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    sql = """SELECT id, name, main_category_ru, sub_category_ru, actual_price, ratings, link FROM data"""
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
 @app.route('/api/cosine_search', methods=['POST'])
 def cosine_search():
     data = request.get_json(force=True)
-    user_query = data.get('message') or data.get('query') or ''
-    user_query = user_query.strip()
+    user_query = data.get('query', '').strip()
     if not user_query:
         return jsonify({"reply": "Пустой запрос", "products": []})
 
-    # Лемматизация запроса (только для поиска по data, поле lemmas уже заполнено скриптом)
-    import pymorphy2
-    morph = pymorphy2.MorphAnalyzer()
-    def lemmatize(text):
-        return ' '.join([morph.parse(w)[0].normal_form for w in text.split() if w.isalpha()])
+    all_products = get_all_products_data()
+    docs = []
+    for row in all_products:
+        doc = ' '.join([
+            str(row.get('name') or ''),
+            str(row.get('main_category_ru') or ''),
+            str(row.get('sub_category_ru') or '')
+        ])
+        docs.append(doc)
 
-    user_lem = lemmatize(user_query.lower())
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    sql = """
-        SELECT id, name, main_category_ru, sub_category_ru, actual_price, ratings, link
-        FROM data
-        WHERE lemmas LIKE %s
-        LIMIT 12
-    """
-    like = f"%{user_lem}%"
-    cursor.execute(sql, (like,))
-    products = cursor.fetchall()
-    # Fallback на обычный LIKE если леммы не дали результатов
-    if not products:
-        sql2 = """
-            SELECT id, name, main_category_ru, sub_category_ru, actual_price, ratings, link
-            FROM data
-            WHERE name LIKE %s OR main_category_ru LIKE %s OR sub_category_ru LIKE %s
-            LIMIT 12
-        """
-        like_orig = f"%{user_query}%"
-        cursor.execute(sql2, (like_orig, like_orig, like_orig, like_orig))
-        products = cursor.fetchall()
-    conn.close()
+    stop_words = set(stopwords.words('english')) | set(stopwords.words('russian'))
+    vectorizer = TfidfVectorizer(stop_words=stop_words)
+    tfidf_matrix = vectorizer.fit_transform([user_query] + docs)
+    sim_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
+    top_idx = np.argsort(sim_scores)[::-1]
+
+    # ВАЖНО: Порог релевантности (например, 0.18)
+    threshold = 0.18
+    results = [
+        all_products[i] for i in top_idx if sim_scores[i] >= threshold
+    ][:12]
+
+    if not results:
+        return jsonify({
+            "reply": "Ничего не найдено",
+            "products": []
+        })
+
     return jsonify({
-        "reply": f"Найдено товаров: {len(products)}" if products else "Ничего не найдено",
-        "products": products
+        "reply": f"Найдено товаров: {len(results)}",
+        "products": results
     })
 
 if __name__ == '__main__':
