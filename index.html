@@ -210,7 +210,7 @@
         <button id="send" type="submit">→</button>
     </form>
 </div>
-<script>
+<!-- <script>
 const chat = document.getElementById('chat');
 function showMsg(text, who='bot') {
     let div = document.createElement('div');
@@ -254,6 +254,65 @@ document.getElementById('input-area').onsubmit = async e => {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({message: text})
+    });
+    let data = await resp.json();
+    input.disabled = false;
+    if (data.reply) showMsg(data.reply, 'bot');
+    showProducts(data.products);
+};
+</script> -->
+<script>
+const chat = document.getElementById('chat');
+function showMsg(text, who='bot') {
+    let div = document.createElement('div');
+    div.className = 'msg ' + who;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+function showProducts(products) {
+    if (!products || !products.length) return;
+    let wrap = document.createElement('div');
+    wrap.className = 'products';
+    products.forEach(p => {
+        let d = document.createElement('div');
+        d.className = 'prod';
+        d.innerHTML = `
+            <div class="prod-category">${p.Category || ''}</div>
+            <div class="prod-name">${p.name}</div>
+            <div class="prod-price">${p['Selling Price'] ? p['Selling Price'] + '$' : ''}</div>
+            <div class="prod-desc">${p['About Product'] || p.description || ''}</div>
+            <div class="prod-more">
+                <a href="${p['Product Url'] || '#'}" target="_blank" rel="noopener" style="width:100%">
+                    <button class="prod-more-btn">Подробнее</button>
+                </a>
+            </div>
+        `;
+        wrap.appendChild(d);
+    });
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+document.getElementById('input-area').onsubmit = async e => {
+    e.preventDefault();
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text) return;
+    showMsg(text, 'user');
+    input.value = '';
+    input.disabled = true;
+
+    // intent: 'SEARCH' для главной
+    // let resp = await fetch('/api/', {
+    //     method: 'POST',
+    //     headers: {'Content-Type': 'application/json'},
+    //     body: JSON.stringify({message: text, intent: 'SEARCH'})
+    // });
+    let resp = await fetch('/api/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message: text, intent: 'SEARCH'})
     });
     let data = await resp.json();
     input.disabled = false;

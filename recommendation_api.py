@@ -1,6 +1,5 @@
 # import os
 
-# # Ограничиваем потоки для sklearn/numpy
 # os.environ["OPENBLAS_NUM_THREADS"] = "1"
 # os.environ["OMP_NUM_THREADS"] = "1"
 # os.environ["MKL_NUM_THREADS"] = "1"
@@ -14,7 +13,6 @@
 # from sklearn.metrics.pairwise import cosine_similarity
 # from flask_cors import CORS
 
-# # Для поддержки стоп-слов английского и русского
 # import nltk
 # nltk.download('stopwords')
 # from nltk.corpus import stopwords
@@ -32,7 +30,8 @@
 #         cursorclass=pymysql.cursors.DictCursor
 #     )
 
-# def get_all_products():
+# # --- Для главной (index.html) — таблица data2 ---
+# def get_all_products_data2():
 #     conn = get_db_connection()
 #     cursor = conn.cursor()
 #     sql = """SELECT id, name, processed_text, Category, `Selling Price`, `About Product`, description, `Product Url` FROM data2"""
@@ -42,10 +41,6 @@
 #     return rows
 
 # def find_best_match(user_message, all_products):
-#     """
-#     Поиск наиболее релевантного товара по user_message.
-#     Сравнивает по количеству общих слов (и рус, и англ).
-#     """
 #     user_message_lower = user_message.lower()
 #     best_row = None
 #     best_score = 0
@@ -53,11 +48,9 @@
 #         prod_name = (row.get('name') or '').lower()
 #         if not prod_name:
 #             continue
-#         # Считаем количество общих слов между названием товара и сообщением пользователя
 #         prod_tokens = set(prod_name.replace('-', ' ').replace('—', ' ').split())
 #         user_tokens = set(user_message_lower.replace('-', ' ').replace('—', ' ').split())
 #         score = len(prod_tokens & user_tokens)
-#         # Также допускаем частичное подстрочное вхождение фразы для редких случаев
 #         if prod_name in user_message_lower or user_message_lower in prod_name:
 #             score += 2
 #         if score > best_score:
@@ -69,30 +62,21 @@
 # def recommend():
 #     data = request.get_json(force=True)
 #     user_message = data.get('message', '').strip()
-#     all_products = get_all_products()
+#     all_products = get_all_products_data2()
 #     matched_product = find_best_match(user_message, all_products)
 
-#     # debug print (можно убрать)
-#     print("user_message:", repr(user_message))
-#     print("matched_product:", matched_product['name'] if matched_product else None)
-
-#     if not matched_product or not matched_product['processed_text']:
+#     if not matched_product or not matched_product.get('processed_text'):
 #         return jsonify({
 #             "reply": "Товар не найден или нет информации для поиска похожих.",
 #             "products": []
 #         })
 
 #     query_vec = matched_product['processed_text']
-
-#     # Стоп-слова для русского и английского
 #     stop_words = set(stopwords.words('english')) | set(stopwords.words('russian'))
-
 #     docs = [row['processed_text'] if row['processed_text'] else '' for row in all_products]
 #     vectorizer = TfidfVectorizer(stop_words=stop_words)
 #     tfidf_matrix = vectorizer.fit_transform([query_vec] + docs)
 #     sim_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
-
-#     # Берём топ-10 самых похожих (кроме самого товара)
 #     top_idx = np.argsort(sim_scores)[-10:][::-1]
 #     recommended = [
 #         all_products[i] for i in top_idx
@@ -123,23 +107,61 @@
 #     products = cursor.fetchall()
 #     conn.close()
 #     return jsonify({
-#         "reply": f"Найдено товаров: {len(products)}",
+#         "reply": f"Найдено товаров: {len(products)}" if products else "Ничего не найдено",
 #         "products": products
 #     })
 
-# @app.route('/api/list_products')
-# def list_products():
-#     all_products = get_all_products()
-#     return jsonify([row['name'] for row in all_products])
+# # --- Для каталога (catalog.php) — таблица data ---
+# def get_all_products_data():
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     sql = """SELECT id, name, link, ratings, actual_price, main_category_ru, sub_category_ru FROM data"""
+#     cursor.execute(sql)
+#     rows = cursor.fetchall()
+#     conn.close()
+#     return rows
+
+# @app.route('/api/cosine_search', methods=['POST'])
+# def cosine_search():
+#     data = request.get_json(force=True)
+#     print("cosine_search DATA:", data)
+#     user_query = data.get('message', '').strip()
+#     if not user_query:
+#         return jsonify({"reply": "Пустой запрос", "products": []})
+
+#     all_products = get_all_products_data()
+#     if not all_products:
+#         return jsonify({"reply": "Нет товаров в базе.", "products": []})
+
+#     docs = []
+#     for row in all_products:
+#         text = (
+#             (row.get('name') or '') + ' ' +
+#             (row.get('main_category_ru') or '') + ' ' +
+#             (row.get('sub_category_ru') or '')
+#         )
+#         docs.append(text.strip())
+
+#     stop_words = set(stopwords.words('english')) | set(stopwords.words('russian'))
+#     vectorizer = TfidfVectorizer(stop_words=stop_words)
+#     tfidf_matrix = vectorizer.fit_transform([user_query] + docs)
+#     sim_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
+#     top_idx = np.argsort(sim_scores)[-12:][::-1]
+#     results = [all_products[i] for i in top_idx if sim_scores[i] > 0]
+
+#     return jsonify({
+#         "reply": f"Найдено товаров: {len(results)}" if results else "Ничего не найдено",
+#         "products": results
+#     })
 
 # if __name__ == '__main__':
 #     app.run(host='127.0.0.1', port=5000, debug=True)
 import os
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 
 import pymysql
@@ -152,6 +174,12 @@ from flask_cors import CORS
 import nltk
 nltk.download('stopwords')
 from nltk.corpus import stopwords
+
+import pymorphy2
+morph = pymorphy2.MorphAnalyzer()
+
+def lemmatize(text):
+    return ' '.join([morph.parse(w)[0].normal_form for w in text.split()])
 
 app = Flask(__name__)
 CORS(app)
@@ -166,7 +194,7 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
-# --- Для главной (index.html) — таблица data2 ---
+# --- Для главной страницы (data2) ---
 def get_all_products_data2():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -175,54 +203,6 @@ def get_all_products_data2():
     rows = cursor.fetchall()
     conn.close()
     return rows
-
-def find_best_match(user_message, all_products):
-    user_message_lower = user_message.lower()
-    best_row = None
-    best_score = 0
-    for row in all_products:
-        prod_name = (row.get('name') or '').lower()
-        if not prod_name:
-            continue
-        prod_tokens = set(prod_name.replace('-', ' ').replace('—', ' ').split())
-        user_tokens = set(user_message_lower.replace('-', ' ').replace('—', ' ').split())
-        score = len(prod_tokens & user_tokens)
-        if prod_name in user_message_lower or user_message_lower in prod_name:
-            score += 2
-        if score > best_score:
-            best_row = row
-            best_score = score
-    return best_row
-
-@app.route('/api/recommend', methods=['POST'])
-def recommend():
-    data = request.get_json(force=True)
-    user_message = data.get('message', '').strip()
-    all_products = get_all_products_data2()
-    matched_product = find_best_match(user_message, all_products)
-
-    if not matched_product or not matched_product.get('processed_text'):
-        return jsonify({
-            "reply": "Товар не найден или нет информации для поиска похожих.",
-            "products": []
-        })
-
-    query_vec = matched_product['processed_text']
-    stop_words = set(stopwords.words('english')) | set(stopwords.words('russian'))
-    docs = [row['processed_text'] if row['processed_text'] else '' for row in all_products]
-    vectorizer = TfidfVectorizer(stop_words=stop_words)
-    tfidf_matrix = vectorizer.fit_transform([query_vec] + docs)
-    sim_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
-    top_idx = np.argsort(sim_scores)[-10:][::-1]
-    recommended = [
-        all_products[i] for i in top_idx
-        if sim_scores[i] > 0 and all_products[i]['id'] != matched_product['id']
-    ]
-
-    return jsonify({
-        "reply": f"Похожие товары для: {matched_product['name']}" if recommended else "Не найдено похожих товаров",
-        "products": recommended
-    })
 
 @app.route('/api/search', methods=['POST'])
 def search():
@@ -247,41 +227,54 @@ def search():
         "products": products
     })
 
-# --- Для каталога (catalog.php) — таблица data ---
+# --- Для каталога (data) ---
 def get_all_products_data():
     conn = get_db_connection()
     cursor = conn.cursor()
-    sql = """SELECT id, name, link, ratings, actual_price, main_category_ru, sub_category_ru FROM data"""
+    sql = """SELECT id, name, main_category_ru, sub_category_ru, actual_price, ratings, link FROM data"""
     cursor.execute(sql)
     rows = cursor.fetchall()
     conn.close()
     return rows
 
+# Кешируем данные и лемматизированные описания при старте
+all_products = get_all_products_data()
+docs = []
+lemmas = []
+for row in all_products:
+    text = (
+        (row.get('name') or '') + ' ' +
+        (row.get('main_category_ru') or '') + ' ' +
+        (row.get('sub_category_ru') or '')
+    )
+    docs.append(text.strip().lower())
+    lemmas.append(lemmatize(text.strip().lower()))
+vectorizer = TfidfVectorizer()
+tfidf_matrix = vectorizer.fit_transform(lemmas)
+
 @app.route('/api/cosine_search', methods=['POST'])
 def cosine_search():
     data = request.get_json(force=True)
-    print("DATA:", data)
-    user_query = data.get('message', '').strip()
-    print("USER QUERY:", user_query)
-    all_products = get_all_products_data()
-    print("FIRST PRODUCT:", all_products[0] if all_products else 'NO PRODUCTS')
-    docs = []
-    for row in all_products:
-        text = (
-            (row.get('name') or '') + ' ' +
-            (row.get('main_category_ru') or '') + ' ' +
-            (row.get('sub_category_ru') or '')
-        )
-        docs.append(text.strip())
-    print("DOC EXAMPLES:", docs[:3])
-
-    stop_words = set(stopwords.words('english')) | set(stopwords.words('russian'))
-    vectorizer = TfidfVectorizer(stop_words=stop_words)
-    tfidf_matrix = vectorizer.fit_transform([user_query] + docs)
-    sim_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
+    user_query = data.get('message', '').strip().lower()
+    user_query_lem = lemmatize(user_query)
+    # Быстрый LIKE-поиск по леммам (если точное вхождение)
+    simple_results = []
+    for idx, row in enumerate(all_products):
+        for field in ['name', 'main_category_ru', 'sub_category_ru']:
+            field_val = (row.get(field) or '').lower()
+            if user_query in field_val:
+                simple_results.append(row)
+                break
+    if simple_results:
+        return jsonify({
+            "reply": f"Найдено товаров (простой поиск): {len(simple_results)}",
+            "products": simple_results[:12]
+        })
+    # TF-IDF + cosine similarity по леммам (БЫСТРО!)
+    query_vec = vectorizer.transform([user_query_lem])
+    sim_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
     top_idx = np.argsort(sim_scores)[-12:][::-1]
     results = [all_products[i] for i in top_idx if sim_scores[i] > 0]
-
     return jsonify({
         "reply": f"Найдено товаров: {len(results)}" if results else "Ничего не найдено",
         "products": results
