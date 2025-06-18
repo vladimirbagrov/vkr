@@ -312,7 +312,7 @@ def cosine_search():
     top_idx = np.argsort(sim_scores)[::-1]
 
     # ВАЖНО: Порог релевантности (например, 0.18)
-    threshold = 0.18
+    threshold = 0.05
     results = [
         all_products[i] for i in top_idx if sim_scores[i] >= threshold
     ][:12]

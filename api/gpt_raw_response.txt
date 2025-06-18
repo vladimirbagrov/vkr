@@ -1714,3 +1714,69 @@ getIntent:
     }
   }
 }
+getIntent:
+{
+  "id": "gen-1750187997-SQHUuU0TXv4RAB0rKT18",
+  "model": "openai\/gpt-4o-mini",
+  "object": "chat.completion",
+  "created": 1750187997,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "SEARCH: \u0438\u0433\u0440\u0443\u0448\u043a\u0438",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "system_fingerprint": "fp_34a54ae93c",
+  "usage": {
+    "prompt_tokens": 405,
+    "completion_tokens": 15,
+    "total_tokens": 420,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  }
+}
+getIntent:
+{
+  "id": "gen-1750188659-3A3KUFV5Y2ZgJggSuAAn",
+  "model": "openai\/gpt-4o-mini",
+  "object": "chat.completion",
+  "created": 1750188659,
+  "choices": [
+    {
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "SEARCH: \u0438\u0433\u0440\u0443\u0448\u043a\u0438",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ],
+  "system_fingerprint": "fp_34a54ae93c",
+  "usage": {
+    "prompt_tokens": 405,
+    "completion_tokens": 15,
+    "total_tokens": 420,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  }
+}
